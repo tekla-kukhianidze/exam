@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Django
+*.log
+*.pot
+*.pyc
+
+
+staticfiles/
+
+# If using Django Debug Toolbar
+debug_toolbar/
+
+# Environments
+.env
+venv/
+ENV/
+env/
+.venv/
+
+# Pytest
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Migrations (optional — comment this out if you want migrations tracked)
+# */migrations/*.py
+# !*/migrations/__init__.py
+
+# VS Code
+.vscode/
+
+# JetBrains
+.idea/
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+ehthumbs.db
