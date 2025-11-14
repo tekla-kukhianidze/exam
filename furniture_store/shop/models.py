@@ -4,7 +4,7 @@ from django.utils.text import slugify
 from django.core.validators import MinValueValidator
 from django.db.models import Sum, F, DecimalField
 import uuid
-
+from decimal import Decimal
 
 # --- 1. Custom User Model ---
 class CustomUser(AbstractUser):
@@ -182,13 +182,20 @@ class Order(models.Model):
     def __str__(self):
         return f"შეკვეთა #{self.order_number}"
 
+    def get_total_amount_calculated(self):
+
+        total = sum(
+            (item.price if item.price is not None else Decimal('0.00')) * (
+                item.quantity if item.quantity is not None else 0)
+            for item in self.items.all()
+        )
+        return total
 
 class OrderItem(models.Model):
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='items', verbose_name="შეკვეთა")
     product = models.ForeignKey(Product, on_delete=models.PROTECT, verbose_name="პროდუქტი")
-    quantity = models.IntegerField(verbose_name="რაოდენობა")
-    # სტატიკური ფასი შეკვეთის მომენტში
-    price = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="ფასი ერთეულზე")
+    quantity = models.IntegerField(default=0, verbose_name="რაოდენობა")
+    price = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'), verbose_name="ფასი ერთეულზე")
 
     class Meta:
         verbose_name = "შეკვეთის ერთეული"
@@ -201,6 +208,4 @@ class OrderItem(models.Model):
         return f"{self.quantity} x {self.product.name} შეკვეთა #{self.order.order_number}-ში"
 
 
-from django.db import models
 
-# Create your models here.
