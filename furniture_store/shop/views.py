@@ -42,7 +42,7 @@ class CategoryViewSet(viewsets.ModelViewSet):
 # --- Product Views ---
 class ProductViewSet(viewsets.ReadOnlyModelViewSet):
     """
-    პროდუქტების კატალოგი (მხოლოდ წაკითხვა, ფილტრაცია და ძიება).
+    პროდუქტების კატალოგი (წაკითხვა, ფილტრაცია და ძიება)
     """
     queryset = Product.objects.filter(is_available=True).select_related('category').prefetch_related('images')
     serializer_class = ProductSerializer
@@ -172,7 +172,7 @@ class OrderViewSet(viewsets.ReadOnlyModelViewSet):
                     order=order,
                     product=item.product,
                     quantity=item.quantity,
-                    price=item.product.price  # სტატიკური ფასის შენახვა
+                    price=item.product.price
                 )
                 item.product.stock -= item.quantity
                 item.product.save()
@@ -180,9 +180,8 @@ class OrderViewSet(viewsets.ReadOnlyModelViewSet):
             # 3. კალათის გასუფთავება
             cart_items.delete()
 
-        # 4. Celery Task-ის გამოძახება (თუ ჩართულია)
+        # 4. Celery Task-ის გამოძახება
         send_order_confirmation_email.delay(order.id)
-        # ავტომატური განახლება 1 საათის შემდეგ (3600 წამი)
         update_order_status_to_processing.apply_async((order.id,), countdown=3600)
 
         return Response(OrderSerializer(order).data, status=status.HTTP_201_CREATED)

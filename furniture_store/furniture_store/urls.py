@@ -23,6 +23,7 @@ from django.conf.urls.static import static
 urlpatterns = [
     path('admin/', admin.site.urls), # Django Admin-ის URL
     path('api/', include('shop.urls')), # shop აპლიკაციის API URL-ების ჩართვა
+    path('api-auth/', include('rest_framework.urls')),
 ]
 
 if settings.DEBUG:
