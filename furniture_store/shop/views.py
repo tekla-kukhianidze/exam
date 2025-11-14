@@ -1,6 +1,6 @@
 from rest_framework import viewsets, generics, status
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated, AllowAny, IsAdminUser
+from .permissions import AllowAny, IsAuthenticated, IsAdminUser, IsOwnerOrAdmin
 from rest_framework.decorators import action
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
@@ -135,7 +135,7 @@ class OrderViewSet(viewsets.ReadOnlyModelViewSet):
     შეკვეთების ნახვა და შექმნა (შექმნა ხდება კალათიდან).
     """
     serializer_class = OrderSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsOwnerOrAdmin]
 
     def get_queryset(self):
         return Order.objects.filter(user=self.request.user).prefetch_related('items')
