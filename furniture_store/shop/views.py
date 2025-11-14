@@ -1,6 +1,6 @@
 from rest_framework import viewsets, generics, status
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.permissions import IsAuthenticated, AllowAny, IsAdminUser
 from rest_framework.decorators import action
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
@@ -16,26 +16,38 @@ from .serializers import (
 )
 
 
-# Celery Tasks-ის იმპორტი
+# Celery Tasks-ის იმპორტი (კომენტარში)
 # from .tasks import send_order_confirmation_email, update_order_status
 
 
 # --- Category Views ---
-class CategoryViewSet(viewsets.ReadOnlyModelViewSet):
+class CategoryViewSet(viewsets.ModelViewSet):
+    """
+    CRUD ოპერაციები კატეგორიებისთვის (საჯარო GET, ადმინის POST/PUT/DELETE).
+    """
     queryset = Category.objects.filter(is_active=True)
     serializer_class = CategorySerializer
-    permission_classes = [AllowAny]
     lookup_field = 'slug'
+
+    def get_permissions(self):
+        # GET (list, retrieve) ნებადართულია ყველასთვის
+        if self.action in ['list', 'retrieve']:
+            permission_classes = [AllowAny]
+        # POST, PUT, PATCH, DELETE ნებადართულია მხოლოდ ადმინისტრატორებისთვის
+        else:
+            permission_classes = [IsAdminUser]
+        return [permission() for permission in permission_classes]
 
 
 # --- Product Views ---
 class ProductViewSet(viewsets.ReadOnlyModelViewSet):
-    # prefetch_related სურათებისთვის და select_related კატეგორიისთვის
+    """
+    პროდუქტების კატალოგი (მხოლოდ წაკითხვა, ფილტრაცია და ძიება).
+    """
     queryset = Product.objects.filter(is_available=True).select_related('category').prefetch_related('images')
     serializer_class = ProductSerializer
     permission_classes = [AllowAny]
 
-    # ფილტრაცია, ძიება, სორტირება
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ['category__slug', 'color', 'material', 'featured']
     search_fields = ['name', 'description']
@@ -59,9 +71,12 @@ class UserProfileView(generics.RetrieveUpdateAPIView):
 
 # --- Cart Views ---
 class CartViewSet(viewsets.ViewSet):
+    """
+    კალათის მართვა: ნახვა, პროდუქტის დამატება/შემცირება/წაშლა.
+    """
     permission_classes = [IsAuthenticated]
 
-    # GET /api/cart/
+    # GET /api/cart/ (ნაგულისხმევი list მეთოდი)
     def list(self, request):
         cart, created = Cart.objects.get_or_create(user=request.user)
         serializer = CartSerializer(cart)
@@ -78,6 +93,8 @@ class CartViewSet(viewsets.ViewSet):
 
         if quantity <= 0:
             return Response({"detail": "რაოდენობა უნდა იყოს დადებითი."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # მარაგის საწყისი შემოწმება
         if product.stock < quantity:
             return Response({"detail": f"მარაგშია მხოლოდ {product.stock} ერთეული."}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -85,8 +102,9 @@ class CartViewSet(viewsets.ViewSet):
                                                                  defaults={'quantity': quantity})
 
         if not item_created:
+            # თუ პროდუქტი უკვე კალათაშია, ვცდილობთ რაოდენობის გაზრდას
             if product.stock < cart_item.quantity + quantity:
-                return Response({"detail": f"მარაგის ლიმიტი (სულ {product.stock}) გადაჭარბებულია."},
+                return Response({"detail": f"მარაგის ლიმიტი (სულ {product.stock}) გადაჭარღულია."},
                                 status=status.HTTP_400_BAD_REQUEST)
             cart_item.quantity += quantity
             cart_item.save()
@@ -113,18 +131,19 @@ class CartViewSet(viewsets.ViewSet):
 
 # --- Order Views ---
 class OrderViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    შეკვეთების ნახვა და შექმნა (შექმნა ხდება კალათიდან).
+    """
     serializer_class = OrderSerializer
     permission_classes = [IsAuthenticated]
-    search_fields = ['order_number', 'user__username', 'user__first_name']
-    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-    filterset_fields = ['status']
 
     def get_queryset(self):
         return Order.objects.filter(user=self.request.user).prefetch_related('items')
 
-    # POST /api/orders/create/
-    @action(detail=False, methods=['post'])
-    def create(self, request):
+    # POST /api/orders/create/ - შეკვეთის შექმნა კალათიდან
+    # ამ მეთოდს გადავარქვით სახელი, რათა არ კონფლიქტში მოვიდეს ModelViewSet-ის create მეთოდთან.
+    @action(detail=False, methods=['post'], url_path='create')
+    def create_order_from_cart(self, request):
         cart = get_object_or_404(Cart, user=request.user)
         cart_items = cart.items.all()
 
@@ -137,6 +156,7 @@ class OrderViewSet(viewsets.ReadOnlyModelViewSet):
             order = Order.objects.create(
                 user=request.user,
                 total_amount=total_amount,
+                # იღებს მისამართს/ტელეფონს request-დან, თუ არადა, იყენებს მომხმარებლის პროფილის მონაცემებს
                 shipping_address=request.data.get('shipping_address', request.user.address),
                 phone=request.data.get('phone', request.user.phone),
                 notes=request.data.get('notes')
@@ -145,7 +165,6 @@ class OrderViewSet(viewsets.ReadOnlyModelViewSet):
             # 2. შეკვეთის ერთეულების შექმნა (OrderItem) და მარაგის განახლება
             for item in cart_items:
                 if item.product.stock < item.quantity:
-                    # აბრუნებს ცვლილებებს, თუ მარაგი არასაკმარისია
                     transaction.set_rollback(True)
                     return Response({"detail": f"პროდუქტის '{item.product.name}' მარაგი არასაკმარისია."},
                                     status=status.HTTP_400_BAD_REQUEST)
@@ -162,11 +181,7 @@ class OrderViewSet(viewsets.ReadOnlyModelViewSet):
             # 3. კალათის გასუფთავება
             cart_items.delete()
 
-        # 4. Celery Task-ის გამოძახება
+        # 4. Celery Task-ის გამოძახება (თუ ჩართულია)
         # send_order_confirmation_email.delay(order.id)
-        # update_order_status.apply_async((order.id,), countdown=3600)
 
         return Response(OrderSerializer(order).data, status=status.HTTP_201_CREATED)
-
-
-

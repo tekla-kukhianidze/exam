@@ -6,10 +6,6 @@ from .views import (
     CategoryViewSet, ProductViewSet, RegisterView, UserProfileView,
     CartViewSet, OrderViewSet
 )
-from django.contrib import admin
-from django.conf import settings
-from django.conf.urls.static import static
-
 
 router = DefaultRouter()
 router.register(r'categories', CategoryViewSet, basename='category')
@@ -18,7 +14,7 @@ router.register(r'cart', CartViewSet, basename='cart')
 router.register(r'orders', OrderViewSet, basename='order')
 
 urlpatterns = [
-    # Router URLs
+    # DefaultRouter-ის მიერ გენერირებული URL-ები
     path('', include(router.urls)),
 
     # Custom Auth URLs
@@ -28,15 +24,4 @@ urlpatterns = [
     # JWT Login/Token URLs
     path('login/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
-    path('admin/', admin.site.urls),
-
-    # აქ ვრთავთ shop აპლიკაციის URL-ებს /api/ მისამართზე
-    path('api/', include('shop.urls')),
-
 ]
-
-# furniture_store/furniture_store/urls.py (პროექტის მთავარი urls.py)
-
-if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
-    urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
