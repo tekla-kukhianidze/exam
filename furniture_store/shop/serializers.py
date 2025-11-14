@@ -110,3 +110,14 @@ class OrderSerializer(serializers.ModelSerializer):
             'shipping_address', 'phone', 'notes', 'created_at', 'items'
         ]
         read_only_fields = ['order_number', 'user', 'total_amount', 'created_at', 'updated_at', 'status']
+
+
+# --- Password Change Serializer ---
+class PasswordChangeSerializer(serializers.Serializer):
+    old_password = serializers.CharField(required=True)
+    new_password = serializers.CharField(required=True)
+
+    def validate_new_password(self, value):
+        if len(value) < 8:
+            raise serializers.ValidationError("ახალი პაროლი უნდა იყოს მინიმუმ 8 სიმბოლო.")
+        return value

@@ -4,7 +4,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 from .views import (
     CategoryViewSet, ProductViewSet, RegisterView, UserProfileView,
-    CartViewSet, OrderViewSet
+    CartViewSet, OrderViewSet, ChangePasswordView
 )
 
 router = DefaultRouter()
@@ -24,4 +24,6 @@ urlpatterns = [
     # JWT Login/Token URLs
     path('login/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+
+    path('profile/change-password/', ChangePasswordView.as_view(), name='change_password'),
 ]

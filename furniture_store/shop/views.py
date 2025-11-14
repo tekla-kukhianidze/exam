@@ -6,18 +6,18 @@ from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 from django.db import transaction
+from django.contrib.auth import update_session_auth_hash
 
 from .models import (
     CustomUser, Category, Product, Cart, CartItem, Order, OrderItem
 )
 from .serializers import (
     CategorySerializer, ProductSerializer, UserRegistrationSerializer,
-    UserProfileSerializer, CartSerializer, OrderSerializer
+    UserProfileSerializer, CartSerializer, OrderSerializer, PasswordChangeSerializer
 )
 
+from .tasks import send_order_confirmation_email, update_order_status_to_processing
 
-# Celery Tasks-ის იმპორტი (კომენტარში)
-# from .tasks import send_order_confirmation_email, update_order_status
 
 
 # --- Category Views ---
@@ -141,7 +141,6 @@ class OrderViewSet(viewsets.ReadOnlyModelViewSet):
         return Order.objects.filter(user=self.request.user).prefetch_related('items')
 
     # POST /api/orders/create/ - შეკვეთის შექმნა კალათიდან
-    # ამ მეთოდს გადავარქვით სახელი, რათა არ კონფლიქტში მოვიდეს ModelViewSet-ის create მეთოდთან.
     @action(detail=False, methods=['post'], url_path='create')
     def create_order_from_cart(self, request):
         cart = get_object_or_404(Cart, user=request.user)
@@ -182,6 +181,36 @@ class OrderViewSet(viewsets.ReadOnlyModelViewSet):
             cart_items.delete()
 
         # 4. Celery Task-ის გამოძახება (თუ ჩართულია)
-        # send_order_confirmation_email.delay(order.id)
+        send_order_confirmation_email.delay(order.id)
+        # ავტომატური განახლება 1 საათის შემდეგ (3600 წამი)
+        update_order_status_to_processing.apply_async((order.id,), countdown=3600)
 
         return Response(OrderSerializer(order).data, status=status.HTTP_201_CREATED)
+
+# --- Password Change View ---
+class ChangePasswordView(generics.UpdateAPIView):
+    serializer_class = PasswordChangeSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_object(self):
+        return self.request.user
+
+    def update(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        serializer = self.get_serializer(data=request.data)
+
+        if serializer.is_valid():
+            # შეამოწმეთ ძველი პაროლი
+            if not self.object.check_password(serializer.validated_data.get("old_password")):
+                return Response({"old_password": ["არასწორია ძველი პაროლი."]}, status=status.HTTP_400_BAD_REQUEST)
+
+            # პაროლის შეცვლა
+            self.object.set_password(serializer.validated_data.get("new_password"))
+            self.object.save()
+
+            # სესიის ჰეშის განახლება, რათა მომხმარებელი დარჩეს ავტორიზებული
+            update_session_auth_hash(request, self.object)
+
+            return Response({"detail": "პაროლი წარმატებით შეიცვალა."}, status=status.HTTP_200_OK)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
