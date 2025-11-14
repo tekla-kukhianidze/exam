@@ -1,157 +1,189 @@
-დავალება შესრულებულია python 3.14.0 ვერსიის local interpreter-ის გამოყენებით.
+# 🛋️ Furniture Store REST API (furniture_store)
 
-დავალების პირობა:
+ეს არის სრულად ფუნქციონალური REST API ონლაინ ავეჯის მაღაზიისთვის, აგებული Django-სა და Django REST Framework-ზე. 
 
-Django Framework-ის გამოყენებით
-📋 პროექტის მიზანი
-შექმენით ონლაინ ავეჯის მაღაზია Django Framework-ის და Django REST Framework-ის გამოყენებით, რომელიც მოიცავს ყველა ძირითად ფუნქციონალს: პროდუქტების კატალოგს, მომხმარებლების რეგისტრაციას, კალათას და შეკვეთების მართვას.
+---
 
-მოდელები
-1.	Category მოდელი
-შექმენით კატეგორიების მოდელი შემდეგი ველებით:
-სავალდებულო ველები:
-●	name – კატეგორიის სახელი
-●	slug – URL-ისთვის გამოსაყენებელი slug (უნიკალური)
-●	description – კატეგორიის მოკლე აღწერა
-●	image – სურათი (ბანერი)
-●	is_active – აქტიურობის სტატუსი
-●	created_at – შექმნის თარიღი
+## 🚀 1. ინსტალაცია და გაშვება
 
-აუცილებელი კატეგორიები:
-1. სკამი (Chair)
-2. დივანი (Sofa)
-3. მაგიდა (Table)
-4. კარადა (Wardrobe)
-5. საწოლი (Bed)
-6.	ტუმბო (Cabinet/Nightstand)
-7.	თარო (Shelf)
-8.	სავარძელი (Armchair)
-9.	აივნის/ეზოს ავეჯი (Outdoor Furniture)
+პროექტის გასაშვებად აუცილებელია: Django (API), Celery Worker და Celery Beat.
 
+### 1.1. გარემოს მომზადება
 
-2.	Product მოდელი
-შექმენით პროდუქტების მოდელი შემდეგი ველებით:
-ძირითადი ველები:
+1.  **ვირტუალური გარემოს შექმნა:**
+    ```bash
+    python -m venv venv
+    .venv\Scripts\activate  # Windows PowerShell/CMD
+    # source venv/bin/activate # Linux/macOS
+    ```
 
-●	name – პროდუქტის სახელი
-●	slug – პროდუქტის slug (უნიკალური)
-●	category – ForeignKey → Category
-●	description – პროდუქტის დეტალური აღწერა
-●	price – ფასი
-●	stock – მარაგის რაოდენობა
-●	is_available – ხელმისაწვდომობა
-●	featured – გამორჩეული პროდუქტი
-●	created_at, updated_at – თარიღები
+2.  **დამოკიდებულებების(Dependencies) ინსტალაცია:**
+    ```bash
+    pip install -r requirements.txt
+    ```
 
-ატრიბუტები (choices):
-●	color – ფერი (მაგ: თეთრი, შავი, ყავისფერი, ნაცრისფერი, ბეჟი)
-●	material – მასალა (მაგ: ხე, ლითონი, მინა, ტყავი, ტექსტილი, პლასტიკი)
+3.  **Redis Server-ის გაშვება:**
+    * დარწმუნდით, რომ Redis Server გაშვებულია ლოკალურ მანქანაზე ნაგულისხმევ პორტზე (`6379`). Celery იყენებს Redis-ს, როგორც Broker-ს.
 
-სურათები:
-●	დამატებითი ფოტოები (ერთი სურათი აუცილებლად, თუმცა რამდენსაც მოისურვებს იმდენის ატვირთვის უფლება უნდა ქონდეს)
+### 1.2. მონაცემთა ბაზის კონფიგურაცია
 
-3.	CustomUser
+1.  **მოდელების მიგრაცია (ცხრილების შექმნა):**
+    ```bash
+    python manage.py makemigrations shop
+    python manage.py migrate
+    ```
 
-მომხმარებელი
-ველები:
+2.  **სუპერმომხმარებლის შექმნა (Admin-ში შესასვლელად):**
+    ```bash
+    python manage.py createsuperuser
+    ```
+    * *შექმენით ტესტ მომხმარებელი, მაგალითად: `Username: testadmin`, `Password: adminpass`.*
 
-●	first_name - სახელი
-●	last_name - სახელი
-●	phone - მობილურის ნომერი
-●	address - მისამართი
-●	birth_date - დაბადების თარიღი
+### 1.3. სერვისების გაშვება
 
-მეთოდები:
-●	get_full_name() – სახელი + გვარი
+გახსენით **სამი ცალკეული ტერმინალი** და გაუშვით შემდეგი ბრძანებები:
 
+| ფანჯარა | ბრძანება | ფუნქცია |
+| :--- | :--- | :--- |
+| **1. Django Server** | `python manage.py runserver` | უშვებს API-ს და Django Admin-ს. |
+| **2. Celery Worker** | `celery -A furniture_store worker -l info` | ასრულებს ამოცანებს (Email-ის გაგზავნა, სტატუსის განახლება). |
+| **3. Celery Beat** | `celery -A furniture_store beat -l info` | ამუშავებს პერიოდულ, დაგეგმილ ამოცანებს (`django-celery-beat`-ის მიხედვით). |
 
-4.	Cart და CartItem
-Cart მოდელი:
-●	user – OneToOne → CustomUser
-●	updated_at - განახლების თარიღი
+---
 
+## 2. API ენდპოინტები
 
-CartItem მოდელი:
-●	cart – ForeignKey → Cart
-●	product – ForeignKey → Product
-●	quantity – რაოდენობა
+API-თან ურთიერთობა ხდება `http://127.0.0.1:8000/api/` საბაზისო URL-ით.
 
-Cart მეთოდები:
-●	get_total_price() – ჯამური ფასი
-●	get_total_items() – კალათაში არსებული პროდუქტების სია
-●	get_total_items_count() – კალათაში არსებული პროდუქტების რაოდენობა
+### 2.1. ავტორიზაცია და მომხმარებლის მართვა
 
-5.	Order და OrderItem
-Order მოდელი:
-●	user – ForeignKey → CustomUser
-●	order_number – უნიკალური ნომერი
-●	status – pending, processing, shipped, delivered, cancelled
-●	total_amount – (total price - DecimalField)
-●	shipping_address
-●	phone
-●	notes (optional)
-●	created_at
-●	updated_at
+* **`POST /api/register/` - მომხმარებლის რეგისტრაცია**
+    * **აღწერა:** ქმნის ახალ მომხმარებელს.
+    * **Request Body (JSON):**
+        ```json
+        {
+            "username": "newuser",
+            "email": "user@example.com",
+            "password": "strongpassword123",
+            "first_name": "მარიამ",
+            "last_name": "ქავთარაძე",
+            "phone": "577123456",
+            "address": "თბილისი, მელიქიშვილის 5",
+            "birth_date": "1995-10-25"
+        }
+        ```
+    * **Response:** `{"username": "newuser", "email": "user@example.com", ...}` (მომხმარებლის დეტალები)
 
-OrderItem მოდელი:
-●	order – ForeignKey → Order
-●	product – ForeignKey → Product
-●	quantity – რაოდენობა
-●	price – შეკვეთის მომენტში (აუცილებელია სტატიკურად შევინახოთ რა ფასად გაიყიდა პროდუქტი)
+* **`POST /api/login/` - მომხმარებლის შესვლა (JWT Token-ის მიღება)**
+    * **აღწერა:** აბრუნებს JWT `access` და `refresh` ტოკენებს.
+    * **Request Body (JSON):**
+        ```json
+        {
+            "username": "newuser",
+            "password": "strongpassword123"
+        }
+        ```
+    * **Response:** `{"refresh": "...", "access": "..."}`
 
+* **`GET /api/profile/` - მომხმარებლის პროფილის ნახვა**
+    * **აღწერა:** აბრუნებს მიმდინარე ავტორიზებული მომხმარებლის დეტალებს.
+    * **Headers:** `Authorization: Bearer <access_token>`
+    * **Response:** `{"id": 1, "username": "newuser", "email": "user@example.com", ...}`
 
-Django Admin კონფიგურაცია
-აუცილებელია, რომ Django Admin იყოს სრულად გამართული:
+* **`PUT /api/profile/` - მომხმარებლის პროფილის განახლება**
+    * **აღწერა:** ანახლებს მიმდინარე ავტორიზებული მომხმარებლის პროფილის ინფორმაციას.
+    * **Headers:** `Authorization: Bearer <access_token>`
+    * **Request Body (JSON):** (შეცვალეთ მხოლოდ ის ველები, რომელთა განახლებაც გსურთ)
+        ```json
+        {
+            "first_name": "მარი",
+            "address": "თბილისი, რუსთაველის 10"
+        }
+        ```
+    * **Response:** განახლებული მომხმარებლის დეტალები.
 
-●	CategoryAdmin → ძიება სახელით, ფილტრი აქტიურობის მიხედვით, slug-ის ავტომატური გენერაცია.
-●	ProductAdmin → ძიება სახელით, ფილტრი კატეგორიის, ფერის და მასალის მიხედვით, ფასისა და მარაგის რედაქტირება პირდაპირ სიიდან (product images model tabular inline-ის გამოყენებით )
-●	CustomUserAdmin → ძიება ტელეფონისა და მომხმარებლის სახელით, ფილტრი მისამართის მიხედვით.
-●	CartAdmin → ფილტრი მომხმარებლის მიხედვით, ასევე tabular inline-ის გამოყენებით მოდელის დეტალურზე დაამატეთ მისი მოკავშერე მოდელი CartItem
-●	OrderAdmin → ძიება შეკვეთის ნომრით და მომხმარებლის მიხედვით, ფილტრი სტატუსისა და თარიღის მიხედვით. ასევე tabular inline-ის გამოყენებით მოდელის დეტალურზე დაამატეთ მისი მოკავშერე მოდელი OrderItem
+### 2.2. პროდუქტის კატალოგი
 
-API (Using Django Rest Framework)
-პროექტს უნდა ქონდეს REST API (Django REST Framework), რომელიც უზრუნველყოფს ძირითადი მოდელების მენეჯმენტს:
+* **`GET /api/categories/` - ყველა კატეგორიის სია**
+    * **აღწერა:** აბრუნებს ყველა აქტიურ კატეგორიას.
+    * **Headers:** N/A (ყველასთვის ხელმისაწვდომია)
+    * **Response:** `[{"id": 1, "name": "სკამი", "slug": "chair"}, ...]`
 
-Endpoints:
+* **`GET /api/categories/{id}/` - კონკრეტული კატეგორიის დეტალები**
+    * **Headers:** N/A
 
-Category
-●	GET /api/categories/ – ყველა კატეგორია
-●	GET /api/categories/<id>/ – კონკრეტული კატეგორია
+* **`GET /api/products/` - ყველა პროდუქტის სია**
+    * **აღწერა:** აბრუნებს ყველა ხელმისაწვდომ პროდუქტს. მხარს უჭერს ფილტრაციას და ძებნას.
+    * **Headers:** N/A (ყველასთვის ხელმისაწვდომია)
+    * **Query Parameters (მაგალითები):**
+        * `/api/products/?category=chair` - ფილტრავს კატეგორიის მიხედვით.
+        * `/api/products/?search=დივანი` - ეძებს პროდუქტის სახელით.
+        * `/api/products/?min_price=1000&max_price=2000` - ფასის დიაპაზონის მიხედვით.
+    * **Response:** `[{"id": 101, "name": "მინიმალისტური სკამი", "price": "350.00", ...}, ...]`
 
-Product
-●	GET /api/products/ – ყველა პროდუქტი
-●	GET /api/products/<id>/ – კონკრეტული პროდუქტი
-●	ფილტრაცია შესაძლებელია კატეგორიით, ფერით, მასალით
+* **`GET /api/products/{id}/` - კონკრეტული პროდუქტის დეტალები**
+    * **Headers:** N/A
 
-User (CustomUser)
-●	POST /api/register/ – რეგისტრაცია
-●	POST /api/login/ – ავტორიზაცია
-●	GET /api/profile/ – ავტორიზებული მომხმარებლის პროფილი
-●	პაროლის ცვლილების ფუნქციონალი – (Advanced)
+### 2.3. კალათა
 
-Cart
-●	GET /api/cart/<id>/ – მომხმარებლის კალათა
-●	POST /api/cart/add/ – პროდუქტის დამატება კალათაში
-●	POST /api/cart/remove/ – პროდუქტის წაშლა კალათიდან
+* **`GET /api/cart/` - კალათის შიგთავსის ნახვა**
+    * **აღწერა:** აბრუნებს ავტორიზებული მომხმარებლის კალათაში არსებულ ყველა პროდუქტს.
+    * **Headers:** `Authorization: Bearer <access_token>`
+    * **Response:** `{"id": 1, "user": 1, "items": [{"id": 1, "product": 101, "quantity": 2}, ...], "total_price": "..."}`
 
-Order
-●	GET /api/orders/ – ყველა შეკვეთა (auth user)
-●	GET /api/orders/<id>/ – კონკრეტული შეკვეთა
-●	POST /api/orders/create/ – ახალი შეკვეთის შექმნა
+* **`POST /api/cart/add/` - პროდუქტის დამატება/განახლება კალათაში**
+    * **აღწერა:** ამატებს ახალ პროდუქტს კალათაში ან ზრდის არსებულის რაოდენობას.
+    * **Headers:** `Authorization: Bearer <access_token>`
+    * **Request Body (JSON):**
+        ```json
+        {
+            "product_id": 101, 
+            "quantity": 2      
+        }
+        ```
+    * **Response:** განახლებული კალათის დეტალები.
 
-Celery Integration (Advanced)
-1. send_order_confirmation_email – შეკვეთის დადასტურების email მომხმარებლისთვის.
+* **`POST /api/cart/remove/` - პროდუქტის წაშლა კალათიდან**
+    * **აღწერა:** შლის პროდუქტს კალათიდან ან ამცირებს მის რაოდენობას.
+    * **Headers:** `Authorization: Bearer <access_token>`
+    * **Request Body (JSON):**
+        ```json
+        {
+            "product_id": 101,  
+            "quantity": 1       
+        }
+        ```
+    * **Response:** განახლებული კალათის დეტალები.
 
-2. update_order_status – შეკვეთის სტატუსის ავტომატური განახლება Pending →Processing-ზე გარკვეული დროის შემდეგ.
+### 2.4. შეკვეთები
 
-წარსადგენი მასალა
-1. Django პროექტი სრული კოდით
-2.	requirements.txt ყველა dependency-ით
-3.	README.md ინსტალაციის ინსტრუქციებით
-4.	მონაცემთა ბაზა (db.sqlite3) ტესტ მონაცემებით
-5.	მედია ფაილები (media/ საქაღალდე)
-6.	სტატიკური საქაღალდე (static/ საქაღალდე)
+* **`POST /api/orders/create/` - შეკვეთის შექმნა**
+    * **აღწერა:** ქმნის ახალ შეკვეთას მომხმარებლის მიმდინარე კალათიდან. კალათა იცლება შეკვეთის შექმნის შემდეგ.
+    * **Headers:** `Authorization: Bearer <access_token>`
+    * **Request Body (JSON):**
+        ```json
+        {
+            "shipping_address": "თბილისი, ჭავჭავაძის გამზირი 20, ბინა 7",
+            "phone": "599123456",
+            "notes": "მიწოდება სამუშაო საათებში, 10:00-დან 18:00-მდე."
+        }
+        ```
+    * **Response:** შექმნილი შეკვეთის დეტალები.
 
-⚠ ჩვეულებრივ Git-ში მედია ფაილები და ბაზა არ კომიტდება, მაგრამ ფინალური დავალების შემთხვევაში აუცილებელია დააკომიტთ რეპოზიტორიაზე.
+* **`GET /api/orders/` - მომხმარებლის ყველა შეკვეთის სია**
+    * **აღწერა:** აბრუნებს ავტორიზებული მომხმარებლის ყველა შეკვეთას.
+    * **Headers:** `Authorization: Bearer <access_token>`
+    * **Response:** `[{"id": 1, "status": "PENDING", "total_price": "...", "created_at": "...", "items": [...], ...}, ...]`
 
+* **`GET /api/orders/{id}/` - კონკრეტული შეკვეთის დეტალები**
+    * **Headers:** `Authorization: Bearer <access_token>` (მხოლოდ საკუთარ შეკვეთებზე წვდომა)
 
+---
+
+## 3. მენეჯმენტი და მონიტორინგი
+
+| სისტემა | მისამართი | ფუნქცია |
+| :--- | :--- | :--- |
+| **Django Admin** | `http://127.0.0.1:8000/admin/` | მონაცემების ხელით მართვა (პროდუქტების დამატება, სტატუსის შეცვლა, მომხმარებლების ნახვა). |
+| **DRF Login/Logout** | `http://127.0.0.1:8000/api-auth/login/` | Django REST Framework-ის Web UI-ში შესვლა/გასვლა. |
+| **Flower Monitor** | `http://localhost:5555` | Celery Worker-ების სტატუსის, რიგებისა და წარსული ამოცანების რეალურ დროში მონიტორინგი. |
